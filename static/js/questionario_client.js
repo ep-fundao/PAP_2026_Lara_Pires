@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     payload.user_id = payload.user_id || localStorage.getItem('uid') || null;
 
     try {
-      const res = await fetch('/api/questionario', {
+      const res = await fetch('/save_questionario', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

@@ -18,29 +18,24 @@ def questionario():
 @app.route("/save_questionario", methods=["POST"])
 def save_questionario_route():
     data = request.get_json()
+
     user_id = data.get("user_id")
-    personal = data.get("personal")
-    respostas = data.get("answers")
+    personal = data.get("personal", {})
+    answers = data.get("answers", {})
 
-    if not user_id or not respostas:
-        return jsonify({"error": "Dados incompletos"}), 400
+    if not user_id:
+        return jsonify({"error": "Utilizador não autenticado"}), 400
 
-    # Salva informações pessoais no perfil
-    if personal:
-        save_or_update_user_profile(user_id, personal)
+    save_or_update_user_profile(user_id, personal)
+    save_questionario(user_id, answers)
 
-    # Salva respostas do questionário
-    save_questionario(user_id, respostas)
+    resultado = analisar_respostas(answers, questions_list)
 
-    # Analisa respostas e gera percentagens usando a lista importada
-    resultado = analisar_respostas(respostas, questions_list)
+    return jsonify(resultado)
 
-    return jsonify(resultado), 200
-
-
-@app.route('/resultado')
-def resultado():
-    return render_template('resultado.html')
+@app.route("/chat-ia")
+def chat_ia():
+    return render_template("chat_ia.html")
 
 if __name__ == '__main__':
     app.run(debug=True)

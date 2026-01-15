@@ -68,12 +68,12 @@ function Questionario() {
     setPersonal({...personal, [e.target.name]: e.target.value});
   };
 
-  const handleScaleChange = (qId, value) => {
-    setAnswers(prev => {
-      const current = prev[qId] === value ? null : value;
-      return { ...prev, [qId]: current };
-    });
-  };
+const handleScaleChange = (qId, value) => {
+  setAnswers(prev => ({ 
+    ...prev, 
+    [qId]: value 
+  }));
+};
 
   const handleChange = (qId, value) => {
     setAnswers(prev => ({ ...prev, [qId]: value }));
@@ -82,13 +82,33 @@ function Questionario() {
   const handleSubmit = (e) => {
     e.preventDefault();
     const user_id = localStorage.getItem("uid");
+    const unanswered = questions
+  .filter(q => q.type === "scale")
+  .some(q => !answers[q.id]);
+
+if (unanswered) {
+  alert("Por favor responde a todas as perguntas de escala.");
+  return;
+}
+
     fetch("/save_questionario", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id, personal, answers })
-    }).then(res => {
-      if(res.ok) window.location.href = "/resultado";
-    });
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ user_id, personal, answers })
+})
+.then(async res => {
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Erro no servidor");
+  return data;
+})
+.then(data => {
+
+  window.location.href = "/chat-ia";
+})
+.catch(err => {
+  alert("Erro ao submeter questionário: " + err.message);
+});
+
   };
 
   return (
