@@ -7,12 +7,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <!-- CDN compat (coloca isto no index.html, antes de carregar firebase_auth.js) -->
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-
-<!-- depois carrega o teu script -->
-<script src="{{ url_for('static', filename='js/firebase_auth.js') }}"></script>
 
 <div class="container">
 
@@ -94,7 +88,7 @@ window.loginEmailPassword = function(e) {
     signInWithEmailAndPassword(auth, email, password)
     .then(userCredential => {
         localStorage.setItem("uid", userCredential.user.uid);
-    window.location.href = "/chat";    })
+    window.location.href = "/perfil";    })
     .catch(error => alert(error.message));
 }
 
@@ -107,7 +101,7 @@ window.signupEmailPassword = function(e) {
     createUserWithEmailAndPassword(auth, email, password)
     .then(userCredential => {
         localStorage.setItem("uid", userCredential.user.uid);
-    window.location.href = "/questionario";
+    window.location.href = "/perfil";
     })
     .catch(error => alert(error.message));
 }
@@ -117,7 +111,7 @@ window.loginWithGoogle = function() {
     signInWithPopup(auth, provider)
     .then(result => {
         localStorage.setItem("uid", result.user.uid);
-        window.location.href = 'chat.html'; // Google login vai sempre pro chat
+        window.location.href = '/perfil'; // Google login vai sempre pro perfil
     })
     .catch(error => alert(error.message));
 }

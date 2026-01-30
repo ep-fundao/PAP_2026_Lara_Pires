@@ -15,6 +15,14 @@ def landing():
 def questionario():
     return render_template('questionario.html')
 
+@app.route('/perfil')
+def perfil():
+    return render_template('perfil.html')
+
+@app.route('/perfil_cadastro')
+def perfil_cadastro():
+    return render_template('perfil_cadastro.html')
+
 @app.route("/save_questionario", methods=["POST"])
 def save_questionario_route():
     data = request.get_json()
