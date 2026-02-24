@@ -1,49 +1,51 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, send_from_directory
 from flask_cors import CORS
-from services.db_service import save_or_update_user_profile, save_questionario
-from services.ai_service import analisar_respostas
-from services.questionario_questions import questions_list
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", template_folder="templates")
 CORS(app)
 
-@app.route('/')
-def landing():
-    return render_template('index.html')
+# -------------------------
+# Landing / Auth page
+# -------------------------
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-@app.route('/questionario')
-def questionario():
-    return render_template('questionario.html')
+# -------------------------
+# React build (Vite) output
+# -------------------------
+REACT_DIST_DIR = os.path.join(app.root_path, "static", "react")
 
-@app.route('/perfil')
+def serve_react():
+    # serve o index.html do build
+    return send_from_directory(REACT_DIST_DIR, "index.html")
+
+# rotas que devem abrir o React SPA
+@app.route("/perfil")
 def perfil():
-    return render_template('perfil.html')
+    return serve_react()
 
-@app.route('/perfil_cadastro')
+@app.route("/perfil_cadastro")
 def perfil_cadastro():
-    return render_template('perfil_cadastro.html')
+    return serve_react()
 
-@app.route("/save_questionario", methods=["POST"])
-def save_questionario_route():
-    data = request.get_json()
+@app.route("/chat")
+def chat():
+    return serve_react()
 
-    user_id = data.get("user_id")
-    personal = data.get("personal", {})
-    answers = data.get("answers", {})
+# (Opcional, mas recomendado)
+# Se tiveres rotas internas do React tipo /perfil/editar ou /chat/123,
+# isto garante que não dá 404 no refresh.
+@app.route("/<path:path>")
+def spa_fallback(path):
+    # deixa o Flask servir ficheiros reais do /static
+    static_path = os.path.join(app.root_path, "static", path)
+    if os.path.isfile(static_path):
+        return send_from_directory(app.static_folder, path)
 
-    if not user_id:
-        return jsonify({"error": "Utilizador não autenticado"}), 400
+    # fallback para o React
+    return serve_react()
 
-    save_or_update_user_profile(user_id, personal)
-    save_questionario(user_id, answers)
-
-    resultado = analisar_respostas(answers, questions_list)
-
-    return jsonify(resultado)
-
-@app.route("/chat-ia")
-def chat_ia():
-    return render_template("chat_ia.html")
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)

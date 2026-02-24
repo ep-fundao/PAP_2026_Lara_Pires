@@ -10,8 +10,8 @@
 
 <div class="container">
 
-    <h1>Descobre a tua Profissão</h1>
-    <p class="intro">Preenche o questionário e recebe sugestões personalizadas de carreira.</p>
+    <h1>Bem vindo ao ProfChoise.IA</h1>
+    <p class="intro">Descobre a tua vocação</p>
 
     <!-- Botões de tab -->
     <div class="tabs">
@@ -101,7 +101,7 @@ window.signupEmailPassword = function(e) {
     createUserWithEmailAndPassword(auth, email, password)
     .then(userCredential => {
         localStorage.setItem("uid", userCredential.user.uid);
-    window.location.href = "/perfil";
+    window.location.href = "/perfil_cadastro";
     })
     .catch(error => alert(error.message));
 }
