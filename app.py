@@ -30,6 +30,10 @@ def perfil():
 def perfil_cadastro():
     return serve_react()
 
+@app.route("/healthz")
+def healthz():
+    return "ok", 200
+
 @app.route("/chat")
 def chat():
     return serve_react()
