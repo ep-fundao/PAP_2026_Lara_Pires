@@ -8,7 +8,7 @@ export default function App() {
       <Route path="/" element={<Navigate to="/perfil" replace />} />
       <Route path="/perfil" element={<Perfil />} />
       <Route path="/perfil_cadastro" element={<PerfilCadastro />} />
-      <Route path="/chat" element={<div style={{padding:20}}>Chat (a seguir fazemos)</div>} />
+      <Route path="/chat" element={<div style={{padding:20}}>Chat (a seguir fazemos!)</div>} />
       <Route path="*" element={<Navigate to="/perfil" replace />} />
     </Routes>
   );
