@@ -1,15 +1,17 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Perfil from "./pages/Perfil";
-import PerfilCadastro from "./pages/PerfilCadastro";
+import Login from "./pages/Login.jsx";
+import Perfil from "./pages/Perfil.jsx";
+import PerfilCadastro from "./pages/PerfilCadastro.jsx";
+import Chat from "./pages/Chat.jsx";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/perfil" replace />} />
+      <Route path="/" element={<Login />} />
       <Route path="/perfil" element={<Perfil />} />
       <Route path="/perfil_cadastro" element={<PerfilCadastro />} />
-      <Route path="/chat" element={<div style={{padding:20}}>Chat (a seguir fazemos!)</div>} />
-      <Route path="*" element={<Navigate to="/perfil" replace />} />
+      <Route path="/chat" element={<Chat />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
