@@ -8,14 +8,17 @@ export default function PerfilCadastro() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState(null);
-  const [perfil, setPerfil] = useState({ nome: "", nascimento: "", genero: "" });
+  const [perfil, setPerfil] = useState({
+    nome: "",
+    nascimento: "",
+    genero: "",
+  });
   const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (!u) {
-        window.location.href = "/";
+        navigate("/login", { replace: true });
         return;
       }
       setUser(u);
@@ -23,18 +26,19 @@ export default function PerfilCadastro() {
     });
 
     return () => unsub();
-  }, []);
+  }, [navigate]);
 
   const guardar = async (e) => {
     e.preventDefault();
     if (!user) return;
 
     try {
-      setErro("");
       await setDoc(
         doc(db, "users", user.uid),
         {
-          ...perfil,
+          nome: perfil.nome,
+          nascimento: perfil.nascimento,
+          genero: perfil.genero,
           email: user.email,
           criadoEm: serverTimestamp(),
           atualizadoEm: serverTimestamp(),
@@ -42,55 +46,93 @@ export default function PerfilCadastro() {
         { merge: true }
       );
 
-      navigate("/perfil", { replace: true });
-    } catch (e) {
-      console.error("Erro a guardar perfil:", e);
-      setErro(e?.message || "Erro a guardar perfil.");
+      navigate("/chat", { replace: true });
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao guardar perfil.");
     }
   };
 
   if (loading) return <p style={{ textAlign: "center" }}>A carregar...</p>;
 
   return (
-    <div style={{ maxWidth: 520, margin: "30px auto", padding: 16 }}>
-      <h1>Completa o teu perfil</h1>
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <h1 style={styles.title}>Completa o teu perfil</h1>
+        <p style={styles.subtitle}>Só precisas fazer isto uma vez.</p>
 
-      {erro && <p style={{ color: "crimson" }}>{erro}</p>}
+        <form onSubmit={guardar} style={styles.form}>
+          <input
+            style={styles.input}
+            placeholder="Nome"
+            value={perfil.nome}
+            onChange={(e) => setPerfil({ ...perfil, nome: e.target.value })}
+            required
+          />
 
-      <form onSubmit={guardar} style={{
-        background: "#fff", borderRadius: 14, padding: 18,
-        boxShadow: "0 10px 30px rgba(0,0,0,.08)",
-        display: "grid", gap: 10
-      }}>
-        <input
-          placeholder="Nome"
-          value={perfil.nome}
-          onChange={(e) => setPerfil({ ...perfil, nome: e.target.value })}
-          required
-        />
+          <input
+            style={styles.input}
+            type="date"
+            value={perfil.nascimento}
+            onChange={(e) => setPerfil({ ...perfil, nascimento: e.target.value })}
+            required
+          />
 
-        <input
-          type="date"
-          value={perfil.nascimento}
-          onChange={(e) => setPerfil({ ...perfil, nascimento: e.target.value })}
-          required
-        />
+          <select
+            style={styles.input}
+            value={perfil.genero}
+            onChange={(e) => setPerfil({ ...perfil, genero: e.target.value })}
+            required
+          >
+            <option value="">Seleciona o género</option>
+            <option value="Feminino">Feminino</option>
+            <option value="Masculino">Masculino</option>
+            <option value="Outro">Outro</option>
+          </select>
 
-        <select
-          value={perfil.genero}
-          onChange={(e) => setPerfil({ ...perfil, genero: e.target.value })}
-          required
-        >
-          <option value="">Seleciona o género</option>
-          <option value="Feminino">Feminino</option>
-          <option value="Masculino">Masculino</option>
-          <option value="Outro">Outro</option>
-        </select>
-
-        <button type="submit" style={{ padding: 10 }}>
-          Guardar
-        </button>
-      </form>
+          <button style={styles.primaryBtn} type="submit">
+            Guardar
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    display: "grid",
+    placeItems: "center",
+    background: "linear-gradient(180deg, #f6f7ff, #f3f4f6)",
+    padding: 16,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 460,
+    background: "#fff",
+    borderRadius: 18,
+    padding: 18,
+    boxShadow: "0 14px 40px rgba(0,0,0,.08)",
+    border: "1px solid rgba(17,24,39,.06)",
+  },
+  title: { margin: 0, fontSize: 26 },
+  subtitle: { margin: "6px 0 14px", color: "#6b7280", fontWeight: 700 },
+  form: { display: "grid", gap: 10 },
+  input: {
+    padding: "12px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(17,24,39,.14)",
+    outline: "none",
+    fontWeight: 700,
+  },
+  primaryBtn: {
+    background: "#4f46e5",
+    border: "none",
+    color: "#fff",
+    padding: "12px 14px",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 900,
+  },
+};

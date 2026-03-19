@@ -63,7 +63,7 @@ const styles = {
     zIndex: 50,
   },
   nav: {
-    maxWidth: 720,
+    maxWidth: 1100,
     margin: "0 auto",
     display: "flex",
     gap: 10,

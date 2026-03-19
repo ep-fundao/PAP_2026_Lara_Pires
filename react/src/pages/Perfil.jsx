@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "../firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { onAuthStateChanged, sendPasswordResetEmail } from "firebase/auth";
+import { onAuthStateChanged, sendPasswordResetEmail, signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import Footer from "../components/Footer";
 
@@ -19,7 +19,7 @@ export default function Perfil() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
-        navigate("/", { replace: true });
+        navigate("/login", { replace: true });
         return;
       }
 
@@ -28,7 +28,6 @@ export default function Perfil() {
       const ref = doc(db, "users", u.uid);
       const snap = await getDoc(ref);
 
-      // Se ainda não tiver perfil, manda para completar
       if (!snap.exists()) {
         navigate("/perfil_cadastro", { replace: true });
         return;
@@ -54,10 +53,26 @@ export default function Perfil() {
     return `${user.uid.slice(0, 6)}...${user.uid.slice(-4)}`;
   }, [user]);
 
-  const resetPassword = async () => {
-    if (!user?.email) return;
+const resetPassword = async () => {
+  if (!user?.email) {
+    alert("Não foi encontrado um email associado a esta conta.");
+    return;
+  }
+
+  try {
     await sendPasswordResetEmail(auth, user.email);
-    alert(`Email de reposição enviado para ${user.email}`);
+    alert(
+      `Email de reposição enviado para ${user.email}.\n\nSe não o encontrares na caixa de entrada, verifica também a pasta de spam/lixo eletrónico.`
+    );
+  } catch (e) {
+    console.error("Erro ao enviar email de reposição:", e);
+    alert("Ocorreu um erro ao enviar o email de reposição.");
+  }
+};
+
+  const terminarSessao = async () => {
+    await signOut(auth);
+    navigate("/login", { replace: true });
   };
 
   const guardar = async () => {
@@ -138,61 +153,69 @@ export default function Perfil() {
 
           <Campo
             label="Nome"
-            value={modoEdicao ? (
-              <input
-                style={styles.input}
-                value={draft.nome}
-                onChange={(e) => setDraft({ ...draft, nome: e.target.value })}
-                placeholder="O teu nome"
-              />
-            ) : (
-              <span style={styles.valueText}>{perfil.nome || "-"}</span>
-            )}
+            value={
+              !modoEdicao ? (
+                <span style={styles.valueText}>{perfil.nome || "-"}</span>
+              ) : (
+                <input
+                  style={styles.input}
+                  value={draft.nome}
+                  onChange={(e) => setDraft({ ...draft, nome: e.target.value })}
+                  placeholder="O teu nome"
+                />
+              )
+            }
           />
 
           <Campo
             label="Data de nascimento"
-            value={modoEdicao ? (
-              <input
-                type="date"
-                style={styles.input}
-                value={draft.nascimento}
-                onChange={(e) => setDraft({ ...draft, nascimento: e.target.value })}
-              />
-            ) : (
-              <span style={styles.valueText}>{perfil.nascimento || "-"}</span>
-            )}
+            value={
+              !modoEdicao ? (
+                <span style={styles.valueText}>{perfil.nascimento || "-"}</span>
+              ) : (
+                <input
+                  type="date"
+                  style={styles.input}
+                  value={draft.nascimento}
+                  onChange={(e) => setDraft({ ...draft, nascimento: e.target.value })}
+                />
+              )
+            }
           />
 
           <Campo
             label="Género"
-            value={modoEdicao ? (
-              <select
-                style={styles.input}
-                value={draft.genero}
-                onChange={(e) => setDraft({ ...draft, genero: e.target.value })}
-              >
-                <option value="">Seleciona...</option>
-                <option value="Feminino">Feminino</option>
-                <option value="Masculino">Masculino</option>
-                <option value="Outro">Outro</option>
-              </select>
-            ) : (
-              <span style={styles.valueText}>{perfil.genero || "-"}</span>
-            )}
+            value={
+              !modoEdicao ? (
+                <span style={styles.valueText}>{perfil.genero || "-"}</span>
+              ) : (
+                <select
+                  style={styles.input}
+                  value={draft.genero}
+                  onChange={(e) => setDraft({ ...draft, genero: e.target.value })}
+                >
+                  <option value="">Seleciona...</option>
+                  <option value="Feminino">Feminino</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              )
+            }
           />
 
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
             <button style={styles.btnDanger} onClick={resetPassword}>
               Repor password
             </button>
+
+            <button style={styles.btnGhost} onClick={terminarSessao}>
+              Terminar sessão
+            </button>
           </div>
         </div>
       </div>
 
-      {/* espaço para não ficar tapado pelo footer */}
       <div style={{ height: 90 }} />
-
       <Footer />
     </div>
   );
@@ -226,10 +249,7 @@ const styles = {
     padding: "28px 14px",
     boxSizing: "border-box",
   },
-  container: {
-    maxWidth: 720,
-    margin: "0 auto",
-  },
+  container: { maxWidth: 720, margin: "0 auto" },
   center: {
     minHeight: "60vh",
     display: "flex",
@@ -252,16 +272,8 @@ const styles = {
     alignItems: "flex-start",
     marginBottom: 14,
   },
-  title: {
-    margin: 0,
-    fontSize: 26,
-    color: "#111827",
-  },
-  subtitle: {
-    margin: "6px 0 0",
-    color: "#6b7280",
-    fontWeight: 600,
-  },
+  title: { margin: 0, fontSize: 26, color: "#111827" },
+  subtitle: { margin: "6px 0 0", color: "#6b7280", fontWeight: 600 },
   card: {
     background: "#fff",
     borderRadius: 18,
@@ -269,11 +281,7 @@ const styles = {
     boxShadow: "0 14px 40px rgba(0,0,0,.08)",
     border: "1px solid rgba(17,24,39,.06)",
   },
-  hr: {
-    height: 1,
-    background: "rgba(17,24,39,.08)",
-    margin: "14px 0",
-  },
+  hr: { height: 1, background: "rgba(17,24,39,.08)", margin: "14px 0" },
   row: {
     display: "flex",
     justifyContent: "space-between",
@@ -282,19 +290,9 @@ const styles = {
     alignItems: "center",
     flexWrap: "wrap",
   },
-  label: {
-    color: "#374151",
-    fontWeight: 800,
-  },
-  value: {
-    color: "#111827",
-    fontWeight: 700,
-    wordBreak: "break-word",
-  },
-  valueText: {
-    color: "#111827",
-    fontWeight: 800,
-  },
+  label: { color: "#374151", fontWeight: 800 },
+  value: { color: "#111827", fontWeight: 700, wordBreak: "break-word" },
+  valueText: { color: "#111827", fontWeight: 800 },
   input: {
     width: 260,
     maxWidth: "100%",
@@ -334,7 +332,3 @@ const styles = {
     fontWeight: 800,
   },
 };
-
-/* Adiciona isto no teu index.css (ou App.css) para o loader rodar:
-@keyframes spin { to { transform: rotate(360deg); } }
-*/

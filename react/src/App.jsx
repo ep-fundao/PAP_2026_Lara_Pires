@@ -7,11 +7,12 @@ import Chat from "./pages/Chat.jsx";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/perfil" element={<Perfil />} />
       <Route path="/perfil_cadastro" element={<PerfilCadastro />} />
       <Route path="/chat" element={<Chat />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
