@@ -135,6 +135,61 @@ export default function Chat() {
     await updateDoc(ref, payload);
   }
 
+  function contarMensagensUser(listaMensagens) {
+    return listaMensagens.filter((m) => m.from === "user").length;
+  }
+
+  function gerarNomeResultado() {
+    const agora = new Date();
+    const data = agora.toLocaleDateString("pt-PT");
+    const hora = agora.toLocaleTimeString("pt-PT", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return `Análise RIASEC — ${data}, ${hora}`;
+  }
+
+  async function criarResultadoRiasec(uid, chatId, mensagens) {
+    try {
+      const response = await fetch(`${API_URL}/api/chatai`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: "resultado",
+          history: mensagens,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao gerar resultado.");
+      }
+
+      const resultado = data.resultado;
+      const title = gerarNomeResultado();
+
+      await addDoc(collection(db, "users", uid, "resultados"), {
+        title,
+        chatId,
+        dominante: resultado.dominante,
+        riasec: resultado.riasec,
+        topAreas: resultado.topAreas,
+        relatorio: resultado.relatorio,
+        cursos: resultado.cursos,
+        profissoes: resultado.profissoes,
+        createdAt: serverTimestamp(),
+      });
+
+      return title;
+    } catch (e) {
+      console.error("Erro ao criar resultado:", e);
+      return null;
+    }
+  }
+
   async function handleNovoChat() {
     if (!user) return;
 
@@ -193,17 +248,54 @@ export default function Chat() {
         throw new Error(data.error || "Erro ao contactar a IA.");
       }
 
-      const respostaIA = {
-        from: "bot",
-        text: data.reply || "Sem resposta da IA.",
-        createdAt: new Date().toISOString(),
-      };
+const respostaIA = {
+  from: "bot",
+  text:
+    typeof data.reply === "string"
+      ? data.reply
+      : data.reply?.text || JSON.stringify(data.reply),
+  createdAt: new Date().toISOString(),
+};
 
       const finalMessages = [...mensagensAtualizadas, respostaIA];
       setMessages(finalMessages);
 
       const chatAtual = chats.find((c) => c.id === chatId);
       const precisaTitulo = !chatAtual || chatAtual.title === "Nova conversa";
+
+      const totalMensagensUser = contarMensagensUser(finalMessages);
+
+      if (totalMensagensUser === 10) {
+        const nomeResultado = await criarResultadoRiasec(
+          user.uid,
+          chatId,
+          finalMessages
+        );
+
+        if (nomeResultado) {
+          const avisoResultado = {
+            from: "bot",
+            text:
+              `A tua análise vocacional já está disponível na secção Resultados.\n\n` +
+              `Nome do resultado: ${nomeResultado}`,
+            createdAt: new Date().toISOString(),
+          };
+
+          const finalComAviso = [...finalMessages, avisoResultado];
+          setMessages(finalComAviso);
+
+          await guardarMensagens(
+            user.uid,
+            chatId,
+            finalComAviso,
+            precisaTitulo ? userText.slice(0, 40) : null
+          );
+
+          await carregarChats(user.uid);
+          setActiveChatId(chatId);
+          return;
+        }
+      }
 
       await guardarMensagens(
         user.uid,
@@ -425,8 +517,9 @@ export default function Chat() {
                   }}
                 >
                   {m.from === "bot" && <div style={styles.botLabel}>IA</div>}
-                  {m.text}
-                </div>
+{typeof m.text === "string"
+  ? m.text
+  : m.text?.text || JSON.stringify(m.text)}                </div>
               </div>
             ))}
 

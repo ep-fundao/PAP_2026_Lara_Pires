@@ -37,6 +37,16 @@ export default function Footer() {
         </NavLink>
 
         <NavLink
+          to="/resultados"
+          style={({ isActive }) => ({
+            ...base,
+            ...(isActive ? activeStyle : inactiveStyle),
+          })}
+        >
+          📊 Resultados
+        </NavLink>
+
+        <NavLink
           to="/perfil"
           style={({ isActive }) => ({
             ...base,
