@@ -14,7 +14,7 @@ app.get("/healthz", (_, res) => {
 });
 
 /**
- * PERGUNTAS FIXAS DO CHAT (RIASEC)
+ * MODELO RIASEC BASE (mantido para cálculo final)
  */
 export const QUESTIONS = [
   { text: "Gostas de trabalhar com ferramentas ou atividades práticas?", type: "R" },
@@ -32,7 +32,7 @@ export const QUESTIONS = [
 ];
 
 /**
- * CALCULAR SCORES RIASEC (🔥 NOVO)
+ * 🔥 SISTEMA DE SCORES RIASEC (CORRIGIDO)
  */
 function calcularScores(history = []) {
   const scores = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
@@ -45,11 +45,19 @@ function calcularScores(history = []) {
     const question = QUESTIONS[userIndex];
     if (!question) return;
 
-    const text = msg.text.toLowerCase();
+    const text = (msg.text || "").toLowerCase().trim();
 
     let value = 0;
-    if (text.includes("sim")) value = 2;
-    else if (text.includes("talvez")) value = 1;
+
+    if (["sim", "gosto", "claro"].some(w => text.includes(w))) {
+      value = 2;
+    } 
+    else if (["talvez", "às vezes", "depende"].some(w => text.includes(w))) {
+      value = 1;
+    } 
+    else if (["não sei", "nao sei", "sei lá", "nao tenho a certeza"].some(w => text.includes(w))) {
+      value = 0;
+    }
 
     scores[question.type] += value;
 
@@ -67,130 +75,146 @@ function countUserMessages(history = []) {
 }
 
 /**
- * Próxima pergunta
+ * 🤖 IA PSICOLÓGICA (NOVA LÓGICA)
  */
-function getNextQuestion(history = []) {
-  const userCount = countUserMessages(history);
+async function buildAIReply(message, history = []) {
+  const systemPrompt = `
+És um psicólogo de orientação vocacional especializado no modelo RIASEC.
 
-  if (userCount < QUESTIONS.length) {
-    return QUESTIONS[userCount];
-  }
+Objetivo:
+- Conversar naturalmente com o utilizador
+- Entender interesses, personalidade e motivações
+- Fazer perguntas adaptativas (não fixas)
+- Reformular perguntas se o utilizador não souber responder
+- Evitar repetição
+- Ser empático e humano
 
-  return null;
+Regras:
+- Nunca faças perguntas iguais
+- Adapta-te à resposta anterior
+- Se o utilizador disser "não sei", ajuda com exemplos
+- Mantém conversa fluida
+
+Responde SEMPRE em JSON:
+{
+  "reply": "mensagem para o utilizador",
+  "focus": "R|I|A|S|E|C ou null"
 }
+`;
 
-/**
- * Fluxo do chat
- */
-function buildChatReply(message, history = []) {
-  const userCount = countUserMessages(history);
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...history.map(m => ({
+        role: m.from === "user" ? "user" : "assistant",
+        content: String(m.text || "")
+      })),
+        { role: "user", content: message }
+      ],
+      temperature: 0.7
+    }),
+  });
 
-  if (userCount === 1) {
-    return QUESTIONS[0];
+  const data = await response.json();
+
+  const raw = data?.choices?.[0]?.message?.content;
+
+  if (!raw) {
+    return { reply: "Não consegui processar a tua resposta. Podes reformular?" };
   }
 
-  const nextQuestion = getNextQuestion(history);
-
-  if (nextQuestion) {
-    return nextQuestion;
-  }
-
-  return "Já reuni informação suficiente para gerar a tua análise vocacional. Consulta a secção Resultados.";
-}
-
-/**
- * API
- */
-app.post("/api/chatai", async (req, res) => {
   try {
-    const { message = "", history = [], mode = "chat" } = req.body;
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return { reply: raw };
+  }
+}
 
-    // ==========================
-    // MODO CHAT
-    // ==========================
-    if (mode === "chat") {
-      const reply = buildChatReply(message, history);
+/**
+ * RESULTADO FINAL (RIASEC)
+ */
+async function gerarResultado(history) {
+  const scores = calcularScores(history);
 
-      return res.json({
-        reply: typeof reply === "string" ? reply : reply.text
-      });
-    }
-
-    // ==========================
-    // MODO RESULTADO
-    // ==========================
-    if (mode === "resultado") {
-
-      // 🔥 CALCULAR SCORES REAIS
-      const scores = calcularScores(history);
-
-      const messages = [
-        {
-          role: "system",
-          content: `
-És um orientador vocacional especializado no modelo RIASEC.
-
-Recebeste um perfil com pontuações RIASEC.
+  const messages = [
+    {
+      role: "system",
+      content: `
+És um orientador vocacional especializado em RIASEC.
 
 Gera um relatório profissional em português de Portugal.
 
-Responde APENAS em JSON válido com:
+Responde APENAS em JSON:
 - dominante
 - riasec
 - topAreas
 - relatorio
 - cursos
 - profissoes
-          `.trim(),
-        },
-        {
-          role: "user",
-          content: JSON.stringify(scores),
-        },
-      ];
+      `.trim(),
+    },
+    {
+      role: "user",
+      content: JSON.stringify(scores),
+    },
+  ];
 
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL || "openai/gpt-3.5-turbo",
-          messages,
-          temperature: 0.3,
-          max_tokens: 500,
-        }),
-      });
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.OPENROUTER_MODEL || "openai/gpt-3.5-turbo",
+      messages,
+      temperature: 0.3,
+    }),
+  });
 
-      const data = await response.json();
+  const data = await response.json();
 
-      if (!response.ok) {
-        return res.status(response.status).json({
-          error: data?.error?.message || "Erro no OpenRouter.",
-        });
-      }
+  const raw = data?.choices?.[0]?.message?.content;
 
-      const rawReply = data?.choices?.[0]?.message?.content;
+  if (!raw) throw new Error("Sem resposta da IA");
 
-      if (!rawReply) {
-        return res.status(500).json({
-          error: "A IA não devolveu um resultado.",
-        });
-      }
+  const cleaned = raw.replace(/```json|```/g, "").trim();
 
-      let resultado;
-      try {
-        // 🔥 REMOVE ```json
-        const cleaned = rawReply.trim().replace(/```json|```/g, "");
-        resultado = JSON.parse(cleaned);
-      } catch (e) {
-        console.error("JSON inválido:", rawReply);
-        return res.status(500).json({
-          error: "A IA não devolveu JSON válido.",
-        });
-      }
+  return JSON.parse(cleaned);
+}
 
+/**
+ * API PRINCIPAL
+ */
+app.post("/api/chatai", async (req, res) => {
+  try {
+    const { message = "", history = [], mode = "chat" } = req.body;
+
+    /**
+     * 💬 CHAT IA (NOVO SISTEMA INTELIGENTE)
+     */
+if (mode === "chat") {
+  const resposta = await buildAIReply(message, history);
+
+  return res.json({
+    reply: resposta.reply,
+    focus: resposta.focus || null
+  });
+}
+
+    /**
+     * 📊 RESULTADO FINAL RIASEC
+     */
+    if (mode === "resultado") {
+      const resultado = await gerarResultado(history);
       return res.json({ resultado });
     }
 

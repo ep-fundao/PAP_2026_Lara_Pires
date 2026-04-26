@@ -149,6 +149,13 @@ export default function Chat() {
     return `Análise RIASEC — ${data}, ${hora}`;
   }
 
+function formatarHistorico(lista) {
+  return lista.map((m) => ({
+    from: m.from,
+    text: m.text,
+  }));
+}
+
   async function criarResultadoRiasec(uid, chatId, mensagens) {
     try {
       const response = await fetch(`${API_URL}/api/chatai`, {
@@ -158,17 +165,16 @@ export default function Chat() {
         },
         body: JSON.stringify({
           mode: "resultado",
-          history: mensagens,
-        }),
+history: formatarHistorico(mensagens),      }),
       });
 
-      const data = await response.json();
+     const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Erro ao gerar resultado.");
-      }
+if (!response.ok) {
+  throw new Error(data.error || "Erro ao gerar resultado.");
+}
 
-      const resultado = data.resultado;
+const resultado = data.resultado;
       const title = gerarNomeResultado();
 
       await addDoc(collection(db, "users", uid, "resultados"), {
@@ -236,14 +242,13 @@ export default function Chat() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          message: userText,
-          history: mensagensAtualizadas,
-        }),
+body: JSON.stringify({
+message: userText,
+history: formatarHistorico(mensagensAtualizadas),
+mode: "chat"}),
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.error || "Erro ao contactar a IA.");
       }
@@ -265,7 +270,7 @@ const respostaIA = {
 
       const totalMensagensUser = contarMensagensUser(finalMessages);
 
-      if (totalMensagensUser === 10) {
+      if (data.finished) {
         const nomeResultado = await criarResultadoRiasec(
           user.uid,
           chatId,
@@ -490,54 +495,60 @@ const respostaIA = {
             </div>
           </div>
 
-          <div style={styles.messages}>
-            {messages.length === 0 && (
-              <div style={styles.emptyChat}>
-                <div style={styles.emptyChatIcon}>✨</div>
-                <h3 style={{ margin: "0 0 8px 0" }}>Começa uma nova conversa</h3>
-                <p style={{ margin: 0, color: "#6b7280" }}>
-                  Faz uma pergunta sobre áreas, cursos, profissões ou vocação.
-                </p>
-              </div>
-            )}
+<div style={styles.messages}>
+  {messages.length === 0 && (
+    <div style={styles.emptyChat}>
+      <div style={styles.emptyChatIcon}>✨</div>
+      <h3 style={{ margin: "0 0 8px 0" }}>Começa uma nova conversa</h3>
+      <p style={{ margin: 0, color: "#6b7280" }}>
+        Faz uma pergunta sobre áreas, cursos, profissões ou vocação.
+      </p>
+    </div>
+  )}
 
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                style={{
-                  ...styles.messageRow,
-                  justifyContent: m.from === "user" ? "flex-end" : "flex-start",
-                }}
-              >
-                <div
-                  style={{
-                    ...styles.bubble,
-                    ...(m.from === "user" ? styles.userBubble : styles.botBubble),
-                    animation: "fadeUp .35s ease",
-                  }}
-                >
-                  {m.from === "bot" && <div style={styles.botLabel}>IA</div>}
-{typeof m.text === "string"
-  ? m.text
-  : m.text?.text || JSON.stringify(m.text)}                </div>
-              </div>
-            ))}
+  {messages.map((m, i) => {
+    const texto =
+      typeof m.text === "string"
+        ? m.text
+        : m.text?.text || JSON.stringify(m.text, null, 2);
 
-            {loading && (
-              <div style={{ ...styles.messageRow, justifyContent: "flex-start" }}>
-                <div style={{ ...styles.bubble, ...styles.botBubble }}>
-                  <div style={styles.botLabel}>IA</div>
-                  <div style={styles.typing}>
-                    <span style={styles.typingDot} />
-                    <span style={styles.typingDot} />
-                    <span style={styles.typingDot} />
-                  </div>
-                </div>
-              </div>
-            )}
+    return (
+      <div
+        key={i}
+        style={{
+          ...styles.messageRow,
+          justifyContent: m.from === "user" ? "flex-end" : "flex-start",
+        }}
+      >
+        <div
+          style={{
+            ...styles.bubble,
+            ...(m.from === "user" ? styles.userBubble : styles.botBubble),
+            animation: "fadeUp .35s ease",
+          }}
+        >
+          {m.from === "bot" && <div style={styles.botLabel}>IA</div>}
+          {texto}
+        </div>
+      </div>
+    );
+  })}
 
-            <div ref={messagesEndRef} />
-          </div>
+  {loading && (
+    <div style={{ ...styles.messageRow, justifyContent: "flex-start" }}>
+      <div style={{ ...styles.bubble, ...styles.botBubble }}>
+        <div style={styles.botLabel}>IA</div>
+        <div style={styles.typing}>
+          <span style={styles.typingDot} />
+          <span style={styles.typingDot} />
+          <span style={styles.typingDot} />
+        </div>
+      </div>
+    </div>
+  )}
+
+  <div ref={messagesEndRef} />
+</div>
 
           <div style={styles.inputBar}>
             <input
