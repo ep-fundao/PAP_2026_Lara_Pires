@@ -1,17 +1,14 @@
 import { useEffect, useState } from "react";
 import { db, auth } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { useParams } from "react-router-dom";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-} from "recharts";
+import { useParams, useNavigate } from "react-router-dom";
+
+import { BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 
 export default function ResultadoDetalhe() {
   const { resultadoId } = useParams();
+  const navigate = useNavigate();
+
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -19,28 +16,16 @@ export default function ResultadoDetalhe() {
       const user = auth.currentUser;
       if (!user) return;
 
-      try {
-        const ref = doc(db, "users", user.uid, "resultados", resultadoId);
-        const snap = await getDoc(ref);
+      const ref = doc(db, "users", user.uid, "resultados", resultadoId);
+      const snap = await getDoc(ref);
 
-        if (snap.exists()) {
-          setData(snap.data());
-        }
-      } catch (e) {
-        console.error("Erro ao carregar detalhe:", e);
-      }
+      if (snap.exists()) setData(snap.data());
     }
 
     carregar();
   }, [resultadoId]);
 
-  if (!data) {
-    return (
-      <div style={{ padding: 30 }}>
-        <p>A carregar resultado...</p>
-      </div>
-    );
-  }
+  if (!data) return <p style={{ padding: 30 }}>A carregar...</p>;
 
   const chartData = [
     { name: "R", value: data.riasec?.R || 0 },
@@ -53,11 +38,26 @@ export default function ResultadoDetalhe() {
 
   return (
     <div style={{ padding: 30 }}>
-      <h1>{data.title || "Resultado"}</h1>
+      
+      {/* 🔙 VOLTAR */}
+      <button
+        onClick={() => navigate("/resultados")}
+        style={{
+          marginBottom: 20,
+          padding: "10px 14px",
+          borderRadius: 8,
+          border: "none",
+          background: "#111",
+          color: "#fff",
+          cursor: "pointer",
+        }}
+      >
+        ← Voltar
+      </button>
 
+      <h1>{data.title}</h1>
       <h2>Perfil dominante: {data.dominante}</h2>
 
-      {/* ✅ GRÁFICO SEGURO */}
       <BarChart width={500} height={300} data={chartData}>
         <XAxis dataKey="name" />
         <YAxis />
@@ -65,21 +65,17 @@ export default function ResultadoDetalhe() {
         <Bar dataKey="value" />
       </BarChart>
 
-      <h3>Relatório</h3>
-      <p>{data.relatorio}</p>
+      <h3>Relatório completo</h3>
+      <p style={{ whiteSpace: "pre-line" }}>{data.relatorio}</p>
 
       <h3>Cursos</h3>
       <ul>
-        {data.cursos?.map((c, i) => (
-          <li key={i}>{c}</li>
-        ))}
+        {data.cursos?.map((c, i) => <li key={i}>{c}</li>)}
       </ul>
 
       <h3>Profissões</h3>
       <ul>
-        {data.profissoes?.map((p, i) => (
-          <li key={i}>{p}</li>
-        ))}
+        {data.profissoes?.map((p, i) => <li key={i}>{p}</li>)}
       </ul>
     </div>
   );

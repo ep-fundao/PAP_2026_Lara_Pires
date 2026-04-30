@@ -129,36 +129,53 @@ async function gerarResultadoIA(history = []) {
     .map((m) => `${m.from === "user" ? "Utilizador" : "IA"}: ${m.text}`)
     .join("\n");
 
-  const systemPrompt = `
-És um especialista em orientação vocacional baseado no modelo RIASEC.
+const systemPrompt = `
+És um psicólogo vocacional especialista no modelo RIASEC.
 
-Analisa toda a conversa entre IA e utilizador.
+Quero um relatório MUITO preciso, estruturado e diferenciado.
 
-Quero um relatório PROFISSIONAL e realista.
+REGRAS IMPORTANTES:
 
-Responde APENAS em JSON válido:
+1. Tens de ordenar claramente os 6 tipos RIASEC do mais forte para o mais fraco.
+2. NÃO podes empatar tipos sem explicação.
+3. Tens de identificar:
+   - 1 tipo dominante claro
+   - 1 tipo secundário forte
+   - 1 tipo complementar médio
+   - restantes baixos
+
+4. Mesmo que um tipo seja baixo, se tiver sinais relevantes tens de explicar isso no relatório.
+
+5. O relatório tem de ser analítico, não genérico.
+
+6. Tens de justificar CADA tipo com base na conversa.
+
+7. Não podes repetir frases tipo "interesse moderado" sem explicar.
+
+8. O output JSON OBRIGATÓRIO:
 
 {
-  "dominante": "tipo principal",
-  "riasec": {
-    "R": 0,
-    "I": 0,
-    "A": 0,
-    "S": 0,
-    "E": 0,
-    "C": 0
-  },
-  "topAreas": ["area1","area2","area3"],
-  "relatorio": "texto completo detalhado",
-  "cursos": ["curso1","curso2","curso3","curso4"],
-  "profissoes": ["profissao1","profissao2","profissao3","profissao4"]
+  "dominante": "",
+  "ranking": [
+    {"tipo":"R","score":0,"analise":""},
+    {"tipo":"I","score":0,"analise":""},
+    {"tipo":"A","score":0,"analise":""},
+    {"tipo":"S","score":0,"analise":""},
+    {"tipo":"E","score":0,"analise":""},
+    {"tipo":"C","score":0,"analise":""}
+  ],
+  "topAreas": [],
+  "relatorio": "",
+  "cursos": [],
+  "profissoes": []
 }
 
-Notas:
-- valores de 0 a 100
-- relatório profundo
-- português de Portugal
-- coerente com a conversa
+9. O "relatorio" deve explicar:
+- porque o dominante é dominante
+- porque o 2º e 3º também são relevantes
+- e porque os outros não dominam
+
+10. Português de Portugal.
 `;
 
   const messages = [
