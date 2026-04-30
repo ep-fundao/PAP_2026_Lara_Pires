@@ -13,195 +13,232 @@ app.get("/healthz", (_, res) => {
   res.status(200).send("ok");
 });
 
-/**
- * PERGUNTAS FIXAS DO CHAT (RIASEC)
- */
-export const QUESTIONS = [
-  { text: "Gostas de trabalhar com ferramentas ou atividades práticas?", type: "R" },
-  { text: "Sentes curiosidade em perceber como as coisas funcionam?", type: "I" },
-  { text: "Gostas de atividades criativas como escrever, desenhar ou criar?", type: "A" },
-  { text: "Gostas de ajudar e apoiar outras pessoas?", type: "S" },
-  { text: "Gostas de liderar ou tomar decisões em grupo?", type: "E" },
-  { text: "Preferes tarefas organizadas e com regras bem definidas?", type: "C" },
-  { text: "Preferes atividades físicas e práticas em vez de teóricas?", type: "R" },
-  { text: "Gostas de resolver problemas complexos e analisar informação?", type: "I" },
-  { text: "Sentes-te confortável a expressar ideias criativas?", type: "A" },
-  { text: "Sentes empatia e facilidade em comunicar com os outros?", type: "S" },
-  { text: "Tens iniciativa para criar projetos ou negócios?", type: "E" },
-  { text: "És uma pessoa organizada e metódica?", type: "C" }
-];
+/* =====================================================
+   CONFIG
+===================================================== */
 
-/**
- * CALCULAR SCORES RIASEC (🔥 NOVO)
- */
-function calcularScores(history = []) {
-  const scores = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-  let userIndex = 0;
+const MODEL =
+  process.env.OPENROUTER_MODEL || "openai/gpt-3.5-turbo";
 
-  history.forEach((msg) => {
-    if (msg.from !== "user") return;
+/* =====================================================
+   HELPERS
+===================================================== */
 
-    const question = QUESTIONS[userIndex];
-    if (!question) return;
+function userMessages(history = []) {
+  return history.filter((m) => m.from === "user");
+}
 
-    const text = msg.text.toLowerCase();
+function botMessages(history = []) {
+  return history.filter((m) => m.from === "bot");
+}
 
-    let value = 0;
-    if (text.includes("sim")) value = 2;
-    else if (text.includes("talvez")) value = 1;
+function countUserAnswers(history = []) {
+  return userMessages(history).length;
+}
 
-    scores[question.type] += value;
+function buildConversation(history = []) {
+  return history
+    .map((m) => ({
+      role: m.from === "user" ? "user" : "assistant",
+      content: m.text,
+    }))
+    .slice(-20);
+}
 
-    userIndex++;
+async function askAI(messages, temperature = 0.7, max_tokens = 500) {
+  const response = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      temperature,
+      max_tokens,
+    }),
   });
 
-  return scores;
-}
+  const data = await response.json();
 
-/**
- * Conta mensagens do user
- */
-function countUserMessages(history = []) {
-  return history.filter((m) => m.from === "user").length;
-}
-
-/**
- * Próxima pergunta
- */
-function getNextQuestion(history = []) {
-  const userCount = countUserMessages(history);
-
-  if (userCount < QUESTIONS.length) {
-    return QUESTIONS[userCount];
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message || "Erro ao contactar OpenRouter."
+    );
   }
 
-  return null;
+  return data?.choices?.[0]?.message?.content || "";
 }
 
-/**
- * Fluxo do chat
- */
-function buildChatReply(message, history = []) {
-  const userCount = countUserMessages(history);
+/* =====================================================
+   CHAT MODE
+===================================================== */
 
-  if (userCount === 1) {
-    return QUESTIONS[0];
-  }
+async function gerarPerguntaIA(history = []) {
+  const respostas = countUserAnswers(history);
 
-  const nextQuestion = getNextQuestion(history);
+  const systemPrompt = `
+És uma IA especialista em orientação vocacional e psicologia de carreira.
 
-  if (nextQuestion) {
-    return nextQuestion;
-  }
+O teu trabalho é conversar naturalmente com o utilizador e descobrir o seu perfil profissional.
 
-  return "Já reuni informação suficiente para gerar a tua análise vocacional. Consulta a secção Resultados.";
+REGRAS IMPORTANTES:
+
+1. Faz APENAS uma pergunta de cada vez.
+2. Nunca repitas perguntas já feitas.
+3. Adapta a próxima pergunta às respostas anteriores.
+4. Fala como um psicólogo profissional e acolhedor.
+5. Usa português de Portugal.
+6. Perguntas curtas e inteligentes.
+7. Explora:
+- gostos
+- personalidade
+- liderança
+- criatividade
+- lógica
+- rotina
+- trabalho em equipa
+- autonomia
+- pressão
+- ambiente ideal
+8. NÃO dês resultado ainda.
+9. Quando já existirem ${respostas} respostas, continua a aprofundar.
+10. Responde APENAS com a próxima pergunta.
+
+Exemplo:
+"Preferes resolver problemas complexos ou trabalhar diretamente com pessoas?"
+`;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...buildConversation(history),
+  ];
+
+  return await askAI(messages, 0.8, 180);
 }
 
-/**
- * API
- */
+/* =====================================================
+   RESULTADO MODE
+===================================================== */
+
+async function gerarResultadoIA(history = []) {
+  const textoConversa = history
+    .map((m) => `${m.from === "user" ? "Utilizador" : "IA"}: ${m.text}`)
+    .join("\n");
+
+  const systemPrompt = `
+És um especialista em orientação vocacional baseado no modelo RIASEC.
+
+Analisa toda a conversa entre IA e utilizador.
+
+Quero um relatório PROFISSIONAL e realista.
+
+Responde APENAS em JSON válido:
+
+{
+  "dominante": "tipo principal",
+  "riasec": {
+    "R": 0,
+    "I": 0,
+    "A": 0,
+    "S": 0,
+    "E": 0,
+    "C": 0
+  },
+  "topAreas": ["area1","area2","area3"],
+  "relatorio": "texto completo detalhado",
+  "cursos": ["curso1","curso2","curso3","curso4"],
+  "profissoes": ["profissao1","profissao2","profissao3","profissao4"]
+}
+
+Notas:
+- valores de 0 a 100
+- relatório profundo
+- português de Portugal
+- coerente com a conversa
+`;
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: textoConversa },
+  ];
+
+  const raw = await askAI(messages, 0.4, 1200);
+
+  const cleaned = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+
+  return JSON.parse(cleaned);
+}
+
+/* =====================================================
+   ROUTE
+===================================================== */
+
 app.post("/api/chatai", async (req, res) => {
   try {
-    const { message = "", history = [], mode = "chat" } = req.body;
+    const {
+      mode = "chat",
+      history = [],
+      message = "",
+    } = req.body;
 
-    // ==========================
-    // MODO CHAT
-    // ==========================
+    /* ================= CHAT ================= */
     if (mode === "chat") {
-      const reply = buildChatReply(message, history);
+      const respostas = countUserAnswers(history);
+
+      // Primeira mensagem
+      if (respostas === 0) {
+        return res.json({
+          reply:
+            "Olá. Sou a tua IA de orientação vocacional. Para começar, fala-me um pouco sobre ti e sobre o que gostas de fazer no teu dia a dia.",
+        });
+      }
+
+      // após 10 respostas terminar chat
+      if (respostas >= 10) {
+        return res.json({
+          reply:
+            "Excelente. Já reuni informação suficiente para gerar a tua análise vocacional completa. Consulta a área Resultados.",
+        });
+      }
+
+      const pergunta = await gerarPerguntaIA(history);
 
       return res.json({
-        reply: typeof reply === "string" ? reply : reply.text
+        reply: pergunta,
       });
     }
 
-    // ==========================
-    // MODO RESULTADO
-    // ==========================
+    /* ================= RESULTADO ================= */
     if (mode === "resultado") {
+      const resultado = await gerarResultadoIA(history);
 
-      // 🔥 CALCULAR SCORES REAIS
-      const scores = calcularScores(history);
-
-      const messages = [
-        {
-          role: "system",
-          content: `
-És um orientador vocacional especializado no modelo RIASEC.
-
-Recebeste um perfil com pontuações RIASEC.
-
-Gera um relatório profissional em português de Portugal.
-
-Responde APENAS em JSON válido com:
-- dominante
-- riasec
-- topAreas
-- relatorio
-- cursos
-- profissoes
-          `.trim(),
-        },
-        {
-          role: "user",
-          content: JSON.stringify(scores),
-        },
-      ];
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL || "openai/gpt-3.5-turbo",
-          messages,
-          temperature: 0.3,
-          max_tokens: 500,
-        }),
+      return res.json({
+        resultado,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return res.status(response.status).json({
-          error: data?.error?.message || "Erro no OpenRouter.",
-        });
-      }
-
-      const rawReply = data?.choices?.[0]?.message?.content;
-
-      if (!rawReply) {
-        return res.status(500).json({
-          error: "A IA não devolveu um resultado.",
-        });
-      }
-
-      let resultado;
-      try {
-        // 🔥 REMOVE ```json
-        const cleaned = rawReply.trim().replace(/```json|```/g, "");
-        resultado = JSON.parse(cleaned);
-      } catch (e) {
-        console.error("JSON inválido:", rawReply);
-        return res.status(500).json({
-          error: "A IA não devolveu JSON válido.",
-        });
-      }
-
-      return res.json({ resultado });
     }
 
-    return res.status(400).json({ error: "Modo inválido." });
-
+    return res.status(400).json({
+      error: "Modo inválido.",
+    });
   } catch (error) {
-    console.error("Erro na IA:", error);
-    res.status(500).json({ error: "Erro na IA." });
+    console.error(error);
+
+    return res.status(500).json({
+      error: "Erro na IA.",
+    });
   }
 });
 
+/* =====================================================
+   START
+===================================================== */
+
 app.listen(process.env.PORT || 3001, () => {
-  console.log(`Servidor da IA a correr na porta ${process.env.PORT || 3001}`);
+  console.log(
+    `Servidor IA ativo na porta ${process.env.PORT || 3001}`
+  );
 });

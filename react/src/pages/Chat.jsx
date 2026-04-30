@@ -20,7 +20,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const BOT_WELCOME = {
   from: "bot",
-  text: "Olá! Sou a tua IA de orientação vocacional. Em que te posso ajudar hoje?",
+  text: "Olá. Sou a tua IA de orientação vocacional. Vou conversar contigo para descobrir o teu perfil profissional. Comecemos: fala-me um pouco sobre ti e sobre o que gostas de fazer.",
   createdAt: new Date().toISOString(),
 };
 
@@ -45,6 +45,7 @@ export default function Chat() {
   const [chatToRename, setChatToRename] = useState(null);
   const [newChatTitle, setNewChatTitle] = useState("");
 
+  // ================= AUTH =================
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
@@ -60,10 +61,14 @@ export default function Chat() {
     return () => unsub();
   }, [navigate]);
 
+  // ================= AUTO SCROLL =================
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
   }, [messages, loading]);
 
+  // ================= FIREBASE =================
   async function carregarChats(uid) {
     try {
       const q = query(
@@ -81,18 +86,20 @@ export default function Chat() {
       setChats(lista);
 
       if (lista.length > 0) {
-        const stillExists = lista.find((c) => c.id === activeChatId);
-        if (stillExists) {
+        const existe = lista.find((c) => c.id === activeChatId);
+
+        if (existe) {
           await abrirChat(uid, activeChatId);
         } else {
           await abrirChat(uid, lista[0].id);
         }
       } else {
-        setActiveChatId(null);
+        setChats([]);
         setMessages([]);
+        setActiveChatId(null);
       }
-    } catch (e) {
-      console.error("Erro a carregar chats:", e);
+    } catch (error) {
+      console.error("Erro carregar chats:", error);
     }
   }
 
@@ -114,11 +121,12 @@ export default function Chat() {
 
       if (snap.exists()) {
         const data = snap.data();
+
         setActiveChatId(chatId);
         setMessages(data.messages || []);
       }
-    } catch (e) {
-      console.error("Erro a abrir chat:", e);
+    } catch (error) {
+      console.error("Erro abrir chat:", error);
     }
   }
 
@@ -135,20 +143,25 @@ export default function Chat() {
     await updateDoc(ref, payload);
   }
 
-  function contarMensagensUser(listaMensagens) {
-    return listaMensagens.filter((m) => m.from === "user").length;
+  // ================= UTIL =================
+  function contarMensagensUser(lista) {
+    return lista.filter((m) => m.from === "user").length;
   }
 
   function gerarNomeResultado() {
     const agora = new Date();
+
     const data = agora.toLocaleDateString("pt-PT");
+
     const hora = agora.toLocaleTimeString("pt-PT", {
       hour: "2-digit",
       minute: "2-digit",
     });
+
     return `Análise RIASEC — ${data}, ${hora}`;
   }
 
+  // ================= RESULTADO =================
   async function criarResultadoRiasec(uid, chatId, mensagens) {
     try {
       const response = await fetch(`${API_URL}/api/chatai`, {
@@ -165,7 +178,7 @@ export default function Chat() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erro ao gerar resultado.");
+        throw new Error(data.error || "Erro gerar resultado.");
       }
 
       const resultado = data.resultado;
@@ -184,26 +197,30 @@ export default function Chat() {
       });
 
       return title;
-    } catch (e) {
-      console.error("Erro ao criar resultado:", e);
+    } catch (error) {
+      console.error(error);
       return null;
     }
   }
 
+  // ================= NOVO CHAT =================
   async function handleNovoChat() {
     if (!user) return;
 
     try {
       const novoId = await criarNovoChat(user.uid);
+
       setActiveChatId(novoId);
       setMessages([BOT_WELCOME]);
+
       await carregarChats(user.uid);
       await abrirChat(user.uid, novoId);
-    } catch (e) {
-      console.error("Erro ao criar novo chat:", e);
+    } catch (error) {
+      console.error(error);
     }
   }
 
+  // ================= ENVIAR =================
   async function enviarMensagem() {
     if (!input.trim() || !user || loading) return;
 
@@ -216,11 +233,11 @@ export default function Chat() {
       currentMessages = [BOT_WELCOME];
     }
 
-    const userText = input.trim();
+    const texto = input.trim();
 
     const mensagemUser = {
       from: "user",
-      text: userText,
+      text: texto,
       createdAt: new Date().toISOString(),
     };
 
@@ -237,7 +254,8 @@ export default function Chat() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: userText,
+          mode: "chat",
+          message: texto,
           history: mensagensAtualizadas,
         }),
       });
@@ -245,27 +263,31 @@ export default function Chat() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erro ao contactar a IA.");
+        throw new Error(data.error || "Erro IA.");
       }
 
-const respostaIA = {
-  from: "bot",
-  text:
-    typeof data.reply === "string"
-      ? data.reply
-      : data.reply?.text || JSON.stringify(data.reply),
-  createdAt: new Date().toISOString(),
-};
+      const respostaIA = {
+        from: "bot",
+        text:
+          typeof data.reply === "string"
+            ? data.reply
+            : data.reply?.text || JSON.stringify(data.reply),
+        createdAt: new Date().toISOString(),
+      };
 
       const finalMessages = [...mensagensAtualizadas, respostaIA];
+
       setMessages(finalMessages);
 
       const chatAtual = chats.find((c) => c.id === chatId);
-      const precisaTitulo = !chatAtual || chatAtual.title === "Nova conversa";
 
-      const totalMensagensUser = contarMensagensUser(finalMessages);
+      const precisaTitulo =
+        !chatAtual || chatAtual.title === "Nova conversa";
 
-      if (totalMensagensUser === 10) {
+      const totalUser = contarMensagensUser(finalMessages);
+
+      // quando chegar a 10 respostas do user cria resultado
+      if (totalUser >= 10) {
         const nomeResultado = await criarResultadoRiasec(
           user.uid,
           chatId,
@@ -273,26 +295,27 @@ const respostaIA = {
         );
 
         if (nomeResultado) {
-          const avisoResultado = {
+          const aviso = {
             from: "bot",
             text:
-              `A tua análise vocacional já está disponível na secção Resultados.\n\n` +
-              `Nome do resultado: ${nomeResultado}`,
+              `A tua análise vocacional está pronta.\n\n` +
+              `Consulta a área Resultados.\n` +
+              `Nome: ${nomeResultado}`,
             createdAt: new Date().toISOString(),
           };
 
-          const finalComAviso = [...finalMessages, avisoResultado];
-          setMessages(finalComAviso);
+          const finalAviso = [...finalMessages, aviso];
+
+          setMessages(finalAviso);
 
           await guardarMensagens(
             user.uid,
             chatId,
-            finalComAviso,
-            precisaTitulo ? userText.slice(0, 40) : null
+            finalAviso,
+            precisaTitulo ? texto.slice(0, 40) : null
           );
 
           await carregarChats(user.uid);
-          setActiveChatId(chatId);
           return;
         }
       }
@@ -301,13 +324,12 @@ const respostaIA = {
         user.uid,
         chatId,
         finalMessages,
-        precisaTitulo ? userText.slice(0, 40) : null
+        precisaTitulo ? texto.slice(0, 40) : null
       );
 
       await carregarChats(user.uid);
-      setActiveChatId(chatId);
     } catch (error) {
-      console.error("Erro ao contactar a IA:", error);
+      console.error(error);
 
       const erroMsg = {
         from: "bot",
@@ -315,25 +337,26 @@ const respostaIA = {
         createdAt: new Date().toISOString(),
       };
 
-      const finalMessages = [...mensagensAtualizadas, erroMsg];
-      setMessages(finalMessages);
+      const finalErro = [...mensagensAtualizadas, erroMsg];
 
-      await guardarMensagens(user.uid, chatId, finalMessages);
+      setMessages(finalErro);
+
+      await guardarMensagens(user.uid, chatId, finalErro);
       await carregarChats(user.uid);
-      setActiveChatId(chatId);
     } finally {
       setLoading(false);
     }
   }
 
+  // ================= APAGAR =================
   function abrirModalApagar(chat) {
     setChatToDelete(chat);
     setDeleteModalOpen(true);
   }
 
   function fecharModalApagar() {
-    setChatToDelete(null);
     setDeleteModalOpen(false);
+    setChatToDelete(null);
   }
 
   async function confirmarApagarChat() {
@@ -342,32 +365,15 @@ const respostaIA = {
     try {
       await deleteDoc(doc(db, "users", user.uid, "chats", chatToDelete.id));
 
-      const eraAtivo = activeChatId === chatToDelete.id;
-
       fecharModalApagar();
+
       await carregarChats(user.uid);
-
-      if (eraAtivo) {
-        const q = query(
-          collection(db, "users", user.uid, "chats"),
-          orderBy("updatedAt", "desc")
-        );
-        const snapshot = await getDocs(q);
-
-        if (snapshot.docs.length > 0) {
-          const primeiro = snapshot.docs[0];
-          await abrirChat(user.uid, primeiro.id);
-        } else {
-          setActiveChatId(null);
-          setMessages([]);
-        }
-      }
-    } catch (e) {
-      console.error("Erro ao apagar chat:", e);
-      alert("Não foi possível apagar a conversa.");
+    } catch (error) {
+      console.error(error);
     }
   }
 
+  // ================= RENOMEAR =================
   function abrirModalRenomear(chat) {
     setChatToRename(chat);
     setNewChatTitle(chat.title || "");
@@ -375,9 +381,9 @@ const respostaIA = {
   }
 
   function fecharModalRenomear() {
+    setRenameModalOpen(false);
     setChatToRename(null);
     setNewChatTitle("");
-    setRenameModalOpen(false);
   }
 
   async function confirmarRenomearChat() {
@@ -391,30 +397,25 @@ const respostaIA = {
 
       fecharModalRenomear();
       await carregarChats(user.uid);
-    } catch (e) {
-      console.error("Erro ao renomear chat:", e);
-      alert("Não foi possível renomear a conversa.");
+    } catch (error) {
+      console.error(error);
     }
   }
 
+  // ================= LOADING =================
   if (authLoading) {
     return (
       <div style={styles.page}>
         <div style={styles.center}>
-          <div style={styles.loader} />
-          <p style={{ marginTop: 12, color: "#6b7280", fontWeight: 600 }}>
-            A carregar...
-          </p>
+          <p>A carregar...</p>
         </div>
       </div>
     );
   }
 
+  // ================= UI =================
   return (
     <div style={styles.page}>
-      <div style={styles.bgOrbOne} />
-      <div style={styles.bgOrbTwo} />
-
       <div style={styles.layout}>
         <aside style={styles.sidebar}>
           <div style={styles.sidebarTop}>
@@ -429,49 +430,42 @@ const respostaIA = {
           </div>
 
           <div style={styles.chatList}>
-            {chats.length === 0 ? (
-              <div style={styles.emptyState}>
-                <span style={{ fontSize: 24 }}>💬</span>
-                <p style={{ margin: 0 }}>Ainda não tens conversas.</p>
-              </div>
-            ) : (
-              chats.map((chat) => (
-                <div
-                  key={chat.id}
-                  style={{
-                    ...styles.chatItemWrap,
-                    ...(activeChatId === chat.id ? styles.chatItemWrapActive : {}),
-                  }}
+            {chats.map((chat) => (
+              <div
+                key={chat.id}
+                style={{
+                  ...styles.chatItemWrap,
+                  ...(activeChatId === chat.id
+                    ? styles.chatItemWrapActive
+                    : {}),
+                }}
+              >
+                <button
+                  style={styles.chatItem}
+                  onClick={() => abrirChat(user.uid, chat.id)}
                 >
+                  <div style={styles.chatItemTitle}>
+                    {chat.title || "Nova conversa"}
+                  </div>
+                </button>
+
+                <div style={styles.chatActions}>
                   <button
-                    onClick={() => abrirChat(user.uid, chat.id)}
-                    style={styles.chatItem}
+                    style={styles.iconBtn}
+                    onClick={() => abrirModalRenomear(chat)}
                   >
-                    <div style={styles.chatItemTitle}>
-                      {chat.title || "Nova conversa"}
-                    </div>
+                    ✏️
                   </button>
 
-                  <div style={styles.chatActions}>
-                    <button
-                      onClick={() => abrirModalRenomear(chat)}
-                      style={styles.iconBtn}
-                      title="Renomear conversa"
-                    >
-                      ✏️
-                    </button>
-
-                    <button
-                      onClick={() => abrirModalApagar(chat)}
-                      style={styles.iconBtn}
-                      title="Apagar conversa"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                  <button
+                    style={styles.iconBtn}
+                    onClick={() => abrirModalApagar(chat)}
+                  >
+                    🗑️
+                  </button>
                 </div>
-              ))
-            )}
+              </div>
+            ))}
           </div>
         </aside>
 
@@ -480,69 +474,65 @@ const respostaIA = {
             <div>
               <h1 style={styles.title}>Chat IA</h1>
               <p style={styles.subtitle}>
-                Explora a tua vocação profissional com uma conversa guiada
+                Orientação vocacional inteligente
               </p>
             </div>
 
             <div style={styles.headerBadge}>
-              <span style={styles.dot} />
+              <span style={styles.dot}></span>
               Online
             </div>
           </div>
 
           <div style={styles.messages}>
-            {messages.length === 0 && (
-              <div style={styles.emptyChat}>
-                <div style={styles.emptyChatIcon}>✨</div>
-                <h3 style={{ margin: "0 0 8px 0" }}>Começa uma nova conversa</h3>
-                <p style={{ margin: 0, color: "#6b7280" }}>
-                  Faz uma pergunta sobre áreas, cursos, profissões ou vocação.
-                </p>
-              </div>
-            )}
-
             {messages.map((m, i) => (
               <div
                 key={i}
                 style={{
-                  ...styles.messageRow,
-                  justifyContent: m.from === "user" ? "flex-end" : "flex-start",
+                  display: "flex",
+                  justifyContent:
+                    m.from === "user" ? "flex-end" : "flex-start",
                 }}
               >
                 <div
                   style={{
                     ...styles.bubble,
-                    ...(m.from === "user" ? styles.userBubble : styles.botBubble),
-                    animation: "fadeUp .35s ease",
+                    ...(m.from === "user"
+                      ? styles.userBubble
+                      : styles.botBubble),
                   }}
                 >
-                  {m.from === "bot" && <div style={styles.botLabel}>IA</div>}
-{typeof m.text === "string"
-  ? m.text
-  : m.text?.text || JSON.stringify(m.text)}                </div>
+                  {m.from === "bot" && (
+                    <div style={styles.botLabel}>IA</div>
+                  )}
+
+                  {typeof m.text === "string"
+                    ? m.text
+                    : JSON.stringify(m.text)}
+                </div>
               </div>
             ))}
 
             {loading && (
-              <div style={{ ...styles.messageRow, justifyContent: "flex-start" }}>
+              <div style={{ display: "flex" }}>
                 <div style={{ ...styles.bubble, ...styles.botBubble }}>
                   <div style={styles.botLabel}>IA</div>
+
                   <div style={styles.typing}>
-                    <span style={styles.typingDot} />
-                    <span style={styles.typingDot} />
-                    <span style={styles.typingDot} />
+                    <span style={styles.typingDot}></span>
+                    <span style={styles.typingDot}></span>
+                    <span style={styles.typingDot}></span>
                   </div>
                 </div>
               </div>
             )}
 
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef}></div>
           </div>
 
           <div style={styles.inputBar}>
             <input
               style={styles.input}
-              type="text"
               placeholder="Escreve a tua mensagem..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -551,32 +541,31 @@ const respostaIA = {
               }}
             />
 
-            <button style={styles.sendBtn} onClick={enviarMensagem} disabled={loading}>
+            <button
+              style={styles.sendBtn}
+              onClick={enviarMensagem}
+              disabled={loading}
+            >
               Enviar
             </button>
           </div>
         </main>
       </div>
 
-      <div style={{ height: 90 }} />
       <Footer />
 
+      {/* MODAL APAGAR */}
       {deleteModalOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalBox}>
-            <div style={styles.modalIcon}>🗑️</div>
-            <h3 style={styles.modalTitle}>Apagar conversa?</h3>
-            <p style={styles.modalText}>
-              Tens a certeza que queres apagar este chat?
-              <br />
-              Esta ação não pode ser anulada.
-            </p>
+            <h3>Apagar conversa?</h3>
 
             <div style={styles.modalActions}>
-              <button style={styles.cancelBtn} onClick={fecharModalApagar}>
+              <button onClick={fecharModalApagar}>
                 Cancelar
               </button>
-              <button style={styles.deleteBtn} onClick={confirmarApagarChat}>
+
+              <button onClick={confirmarApagarChat}>
                 Apagar
               </button>
             </div>
@@ -584,27 +573,25 @@ const respostaIA = {
         </div>
       )}
 
+      {/* MODAL RENOMEAR */}
       {renameModalOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalBox}>
-            <div style={styles.modalIcon}>✏️</div>
-            <h3 style={styles.modalTitle}>Renomear conversa</h3>
-            <p style={styles.modalText}>
-              Escolhe um novo nome para esta conversa.
-            </p>
+            <h3>Renomear conversa</h3>
 
             <input
-              style={styles.modalInput}
               value={newChatTitle}
-              onChange={(e) => setNewChatTitle(e.target.value)}
-              placeholder="Novo nome"
+              onChange={(e) =>
+                setNewChatTitle(e.target.value)
+              }
             />
 
             <div style={styles.modalActions}>
-              <button style={styles.cancelBtn} onClick={fecharModalRenomear}>
+              <button onClick={fecharModalRenomear}>
                 Cancelar
               </button>
-              <button style={styles.saveBtn} onClick={confirmarRenomearChat}>
+
+              <button onClick={confirmarRenomearChat}>
                 Guardar
               </button>
             </div>
