@@ -13,18 +13,11 @@ app.get("/healthz", (_, res) => {
   res.status(200).send("ok");
 });
 
-/* =====================================================
-   CONFIG
-===================================================== */
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 const MODEL =
   process.env.OPENROUTER_MODEL || "openai/gpt-3.5-turbo";
-
-/* =====================================================
-   HELPERS
-===================================================== */
 
 function userMessages(history = []) {
   return history.filter((m) => m.from === "user");
