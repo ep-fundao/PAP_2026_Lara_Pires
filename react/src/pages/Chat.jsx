@@ -20,7 +20,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const BOT_WELCOME = {
   from: "bot",
-  text: "Olá. Sou a tua IA de orientação vocacional. Vou conversar contigo para descobrir o teu perfil profissional. Comecemos: qual a tua discilpina preferida na escola",
+  text: "Olá. Sou a tua IA de orientação vocacional. Vou conversar contigo para descobrir o teu perfil profissional. Comecemos: qual a tua discilpina preferida na escola?",
   createdAt: new Date().toISOString(),
 };
 
